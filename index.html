@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tome of Valor - 2D Turn-Based Medieval RPG</title>
+  <meta name="description" content="A D&D-inspired open world retro pixel turn-based RPG with character customization, potions, magic swords, and custom abilities.">
+  
+  <!-- Retro Fantasy Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Phaser 3 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+</head>
+<body>
+  <div id="app-container">
+    <header>
+      <div id="header-layout">
+        <div>
+          <h1 class="fantasy-title">Tome of Valor</h1>
+          <p class="subtitle">An Open World D&D Adventure</p>
+        </div>
+        
+        <!-- Controls: Auto Walk, Auto Combat & Combat Fast Forward Speed -->
+        <div id="controls-panel">
+          <button id="autowalk-btn" onclick="toggleAutoWalk()" title="Automate character movement and exploration in overworld">
+            <span class="btn-glow"></span>
+            <span class="btn-text">AUTO WALK: OFF</span>
+          </button>
+
+          <button id="autocombat-btn" onclick="toggleAutoCombat()" title="Automate turn-based combat actions during battles">
+            <span class="btn-glow"></span>
+            <span class="btn-text">AUTO COMBAT: OFF</span>
+          </button>
+          
+          <button id="speed-btn" onclick="toggleCombatSpeed()" title="Speed up combat roll delays and animations">
+            <span class="btn-glow"></span>
+            <span class="btn-text">SPEED: 1x</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div id="game-workspace">
+      <!-- Phaser Canvas Container -->
+      <div id="phaser-game-container"></div>
+
+      <!-- Game Side Info / Log Panel -->
+      <div id="side-panel">
+        <div id="stats-panel" class="glass-box">
+          <h3>Hero Sheet</h3>
+          <div class="stat-row"><span>HP:</span> <span id="hero-hp">80 / 80</span></div>
+          <div class="stat-row"><span>Mana:</span> <span id="hero-mp">40 / 40</span></div>
+          <div class="stat-row"><span>ATK (Equipped):</span> <span id="hero-atk">12</span></div>
+          <div class="stat-row"><span>Level:</span> <span id="hero-level">1</span></div>
+          <div class="stat-row"><span>EXP:</span> <span id="hero-exp">0 / 100</span></div>
+        </div>
+
+        <div id="inventory-panel" class="glass-box">
+          <h3>Bag of Holding</h3>
+          <!-- Consumables -->
+          <div id="inventory-items">
+            <div class="inventory-slot empty" id="slot-potion" onclick="usePotionFromBag()" title="Heal Potion - Restores HP">
+              <span class="slot-icon">🧪</span>
+              <span class="slot-label">0 Potions</span>
+            </div>
+          </div>
+          
+          <!-- Weapons collection & Equip UI -->
+          <h4 class="section-title">Weapon Arsenal</h4>
+          <div id="weapons-list">
+            <!-- Weapons are generated dynamically here -->
+          </div>
+        </div>
+
+        <!-- Quest Tracker -->
+        <div id="quest-panel" class="glass-box">
+          <h3>⚔️ The Prophecy</h3>
+          <div class="quest-row">
+            <span class="quest-label">Warlords slain:</span>
+            <span id="quest-warlords" class="quest-val">0 / 3</span>
+          </div>
+          <div class="quest-row">
+            <span class="quest-label">Sacred Relics:</span>
+            <span id="quest-relics" class="quest-val">0 / 3</span>
+          </div>
+          <div id="quest-gate" class="quest-locked">🔒 Castle Gate: SEALED</div>
+          <div id="quest-unlocked" class="quest-open" style="display:none">⚡ CASTLE GATE: OPEN!</div>
+        </div>
+
+        <div id="log-panel" class="glass-box">
+          <h3>Adventure Log</h3>
+          <div id="log-text">
+            <p class="log-entry system">Customize your hero and enter the cursed realm of Valdor. Defeat Ashardalon's 3 Warlords &amp; recover 3 Sacred Relics to unlock the Dark Castle!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p>Use [Arrow Keys] / [WASD] to travel. Find 🗡 Warlord Lairs, 📦 Chests (Relics), and 🌟 Shrines. Defeat Warlords &amp; collect Relics to unlock the Dark Castle!</p>
+    </footer>
+  </div>
+
+  <!-- Game Scripts -->
+  <script src="src/config.js"></script>
+  <script src="src/sprite_gen.js"></script>
+  <script src="src/autoplay.js"></script>
+  <script src="src/story.js"></script>
+  <script src="src/customization.js"></script>
+  <script src="src/map.js"></script>
+  <script src="src/encounter.js"></script>
+  <script src="src/combat.js"></script>
+  <script src="src/boss.js"></script>
+  <script src="src/main.js"></script>
+
+  <!-- Auto-play and Potion HTML trigger helpers -->
+  <script>
+    function toggleAutoWalk() {
+      window.gameState.autoWalkActive = !window.gameState.autoWalkActive;
+      const btn = document.getElementById('autowalk-btn');
+      if (window.gameState.autoWalkActive) {
+        btn.classList.add('active');
+        btn.querySelector('.btn-text').textContent = 'AUTO WALK: ON';
+        window.gameState.log("Auto-Walk Enabled. Character exploring map...", "system");
+      } else {
+        btn.classList.remove('active');
+        btn.querySelector('.btn-text').textContent = 'AUTO WALK: OFF';
+        window.gameState.log("Auto-Walk Disabled. Manual navigation restored.", "system");
+      }
+    }
+
+    function toggleAutoCombat() {
+      window.gameState.autoCombatActive = !window.gameState.autoCombatActive;
+      const btn = document.getElementById('autocombat-btn');
+      if (window.gameState.autoCombatActive) {
+        btn.classList.add('active');
+        btn.querySelector('.btn-text').textContent = 'AUTO COMBAT: ON';
+        window.gameState.log("Auto-Combat Enabled. Battles will run automatically.", "system");
+
+        const activeScene = window.game.scene.getScenes(true)[0];
+        if (activeScene && activeScene.scene.key === 'CombatScene') {
+          activeScene.showMenu();
+        }
+      } else {
+        btn.classList.remove('active');
+        btn.querySelector('.btn-text').textContent = 'AUTO COMBAT: OFF';
+        window.gameState.log("Auto-Combat Disabled. Manual battle inputs restored.", "system");
+        
+        const activeScene = window.game.scene.getScenes(true)[0];
+        if (activeScene && activeScene.scene.key === 'CombatScene' && !activeScene.actionActive) {
+          activeScene.showMenu();
+        }
+      }
+    }
+
+    function toggleCombatSpeed() {
+      const btn = document.getElementById('speed-btn');
+      if (window.gameState.combatSpeed === 1) {
+        window.gameState.combatSpeed = 3;
+        btn.classList.add('active');
+        btn.querySelector('.btn-text').textContent = 'SPEED: 3x (FAST)';
+        window.gameState.log("Combat Fast Forward enabled (3x speed).", "system");
+      } else {
+        window.gameState.combatSpeed = 1;
+        btn.classList.remove('active');
+        btn.querySelector('.btn-text').textContent = 'SPEED: 1x';
+        window.gameState.log("Combat speed restored to normal (1x).", "system");
+      }
+    }
+
+    function usePotionFromBag() {
+      if (window.gameState.combatActive) {
+        window.gameState.log("Select HEAL POTION action in combat menu.", "system");
+      } else {
+        if (window.gameState.inventory.potions > 0) {
+          if (window.gameState.hero.hp >= window.gameState.hero.maxHp) {
+            window.gameState.log("HP is already full!");
+            return;
+          }
+          window.gameState.inventory.potions--;
+          window.gameState.hero.hp = Math.min(window.gameState.hero.maxHp, window.gameState.hero.hp + 40);
+          window.gameState.log(`Drank Heal Potion. Restored 40 HP.`, 'loot');
+          window.gameState.updateHUD();
+        } else {
+          window.gameState.log("No potions remaining!", "system");
+        }
+      }
+    }
+
+    function selectWeapon(weaponName) {
+      if (window.gameState.weapons.includes(weaponName)) {
+        window.gameState.equippedWeapon = weaponName;
+        window.gameState.log(`Equipped ${weaponName.toUpperCase()}!`, "system");
+        
+        const prof = window.RPG_CONFIG.WEAPON_PROFILES[weaponName];
+        if (prof) {
+          window.gameState.hero.atk = window.RPG_CONFIG.BASE_ATK + (window.gameState.hero.level - 1) * 3 + prof.atkBonus;
+          window.gameState.hero.specialAbilityName = prof.specialName;
+          window.gameState.hero.specialAbilityCost = prof.mpCost;
+        }
+
+        const activeScene = window.game.scene.getScenes(true)[0];
+        if (activeScene) {
+          window.SpriteGenerator.updatePlayerTexture(activeScene);
+          if (activeScene.scene.key === 'WorldScene') {
+            activeScene.player.setTexture('player');
+          } else if (activeScene.scene.key === 'CombatScene') {
+            activeScene.playerSprite.setTexture('player');
+            activeScene.hideMenu();
+            activeScene.menuGroup.clear(true, true);
+            activeScene.drawActionMenu();
+            activeScene.showMenu();
+          }
+        }
+        window.gameState.updateHUD();
+      }
+    }
+  </script>
+</body>
+</html>
